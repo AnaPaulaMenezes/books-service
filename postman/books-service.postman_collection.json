@@ -1,0 +1,215 @@
+{
+  "info": {
+    "_postman_id": "b6a5a6a1-6674-4e6e-a217-5d8f7f6b3b1a",
+    "name": "Books Service",
+    "description": "Collection para os endpoints de livros e health check do Books Service. A listagem por status envia o status no caminho e na query porque o controller atualmente exige ambos.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "localhost"
+    },
+    {
+      "key": "bookId",
+      "value": "00000000-0000-0000-0000-000000000000"
+    },
+    {
+      "key": "status",
+      "value": "READING"
+    },
+    {
+      "key": "page",
+      "value": "0"
+    },
+    {
+      "key": "size",
+      "value": "10"
+    }
+  ],
+  "item": [
+    {
+      "name": "Books",
+      "item": [
+        {
+          "name": "Create book",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"title\": \"The Hobbit\",\n  \"author\": \"J. R. R. Tolkien\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "http://{{baseUrl}}:8080/books",
+              "protocol": "http",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "port": "8080",
+              "path": [
+                "books"
+              ]
+            },
+            "description": "Cria um livro e guarda o id retornado em {{bookId}} para as demais requisições."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const response = pm.response.json();",
+                  "if (response.id) {",
+                  "  pm.collectionVariables.set('bookId', response.id);",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Get book by ID",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "http://{{baseUrl}}:8080/books/{{bookId}}",
+              "protocol": "http",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "port": "8080",
+              "path": [
+                "books",
+                "{{bookId}}"
+              ]
+            }
+          }
+        },
+        {
+          "name": "List books by status",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "http://{{baseUrl}}:8080/books/status/{{status}}?status={{status}}&page={{page}}&size={{size}}",
+              "protocol": "http",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "port": "8080",
+              "path": [
+                "books",
+                "status",
+                "{{status}}"
+              ],
+              "query": [
+                {
+                  "key": "status",
+                  "value": "{{status}}"
+                },
+                {
+                  "key": "page",
+                  "value": "{{page}}"
+                },
+                {
+                  "key": "size",
+                  "value": "{{size}}"
+                }
+              ]
+            },
+            "description": "Use NOT_STARTED, READING ou FINISHED. O status precisa ser informado no caminho e na query conforme a assinatura atual do controller."
+          }
+        },
+        {
+          "name": "Update book",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"title\": \"The Hobbit\",\n  \"author\": \"J. R. R. Tolkien\",\n  \"status\": \"READING\",\n  \"rating\": 5,\n  \"startDate\": \"2026-10-05T00:00:00.000Z\",\n  \"finishDate\": null\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "http://{{baseUrl}}:8080/books/{{bookId}}",
+              "protocol": "http",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "port": "8080",
+              "path": [
+                "books",
+                "{{bookId}}"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Delete book",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "http://{{baseUrl}}:8080/books/{{bookId}}",
+              "protocol": "http",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "port": "8080",
+              "path": [
+                "books",
+                "{{bookId}}"
+              ]
+            },
+            "description": "Remove o livro identificado por {{bookId}}."
+          }
+        }
+      ]
+    },
+    {
+      "name": "Actuator",
+      "item": [
+        {
+          "name": "Health",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "http://{{baseUrl}}:8080/actuator/health",
+              "protocol": "http",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "port": "8080",
+              "path": [
+                "actuator",
+                "health"
+              ]
+            }
+          }
+        }
+      ]
+    }
+  ]
+}
