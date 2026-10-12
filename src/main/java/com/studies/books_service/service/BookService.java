@@ -4,6 +4,7 @@ import com.studies.books_service.domain.book.Book;
 import com.studies.books_service.domain.book.ReadingStatus;
 import com.studies.books_service.dto.book.CreateBookDTO;
 import com.studies.books_service.dto.book.UpdateBookDTO;
+import com.studies.books_service.dto.event.BookFinishedEvent;
 import com.studies.books_service.repository.BookRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.Pageable;
@@ -17,6 +18,9 @@ import java.util.UUID;
 public class BookService {
     @Autowired
     private BookRepository bookRepository;
+
+    @Autowired
+    private BookEventPublisher bookEventPublisher;
 
     public Book createBook(CreateBookDTO book) {
         Book newBook = new Book();
@@ -34,10 +38,8 @@ public class BookService {
         Book existingBook = bookRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Book not found"));
 
-        existingBook.setTitle(book.title());
-        existingBook.setAuthor(book.author());
-        existingBook.setStatus(book.status());
-        existingBook.setRating(book.rating());
+        ReadingStatus currentStatus = existingBook.getStatus();
+        ReadingStatus newStatus = book.status();
 
         if(book.startDate() == null && book.status() != ReadingStatus.NOT_STARTED) {
             existingBook.setStartDate(new Date());
@@ -51,7 +53,24 @@ public class BookService {
             existingBook.setFinishDate(book.finishDate());
         }
 
-        return bookRepository.save(existingBook);
+        existingBook.setTitle(book.title());
+        existingBook.setAuthor(book.author());
+        existingBook.setStatus(book.status());
+        existingBook.setRating(book.rating());
+
+        Book updatedBook = bookRepository.save(existingBook);
+
+        if(currentStatus != ReadingStatus.FINISHED && newStatus == ReadingStatus.FINISHED) {
+            bookEventPublisher.publishBookFinishedEvent(new BookFinishedEvent(
+                    updatedBook.getId(),
+                    updatedBook.getTitle(),
+                    updatedBook.getAuthor(),
+                    updatedBook.getRating(),
+                    updatedBook.getFinishDate()
+            ));
+        }
+
+        return updatedBook;
     }
 
     public void deleteBook(UUID bookId) {
