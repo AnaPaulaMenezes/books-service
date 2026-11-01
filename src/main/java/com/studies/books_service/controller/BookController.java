@@ -2,12 +2,18 @@ package com.studies.books_service.controller;
 
 import com.studies.books_service.domain.book.Book;
 import com.studies.books_service.domain.book.ReadingStatus;
+import com.studies.books_service.domain.idempotency.IdempotentResponse;
+import com.studies.books_service.dto.book.BookResponseDTO;
 import com.studies.books_service.dto.book.CreateBookDTO;
 import com.studies.books_service.dto.book.UpdateBookDTO;
 import com.studies.books_service.service.BookService;
+import com.studies.books_service.service.IdempotencyService;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+import tools.jackson.databind.json.JsonMapper;
 
 import java.util.UUID;
 
@@ -18,10 +24,26 @@ public class BookController {
     @Autowired
     private BookService bookService;
 
+    @Autowired
+    private IdempotencyService idempotencyService;
+
+    @Autowired
+    private JsonMapper jsonMapper;
+
     @PostMapping
-    public ResponseEntity<Book> createBook(@RequestBody CreateBookDTO book) {
-        Book newBook = bookService.createBook(book);
-        return ResponseEntity.ok(newBook);
+    public ResponseEntity<String> createBook(
+            @RequestHeader("Idempotency-Key") String key,
+            @RequestBody CreateBookDTO request
+    ) {
+       IdempotentResponse response = idempotencyService.execute(key, request, () -> {
+           Book createdBook = bookService.createBook(request);
+           BookResponseDTO dto = BookResponseDTO.from(createdBook);
+           return new IdempotentResponse(HttpStatus.CREATED.value(), jsonMapper.writeValueAsString(dto));
+        });
+
+        return ResponseEntity.status(response.httpStatus())
+                .contentType(MediaType.APPLICATION_JSON)
+                .body(response.responseBody());
     }
 
     @GetMapping("/{id}")
