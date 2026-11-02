@@ -13,8 +13,6 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-
-import java.time.LocalDate;
 import java.util.Date;
 import java.util.Optional;
 import java.util.UUID;
@@ -39,11 +37,11 @@ class BooksServiceTest {
     @Test
     void shouldPublishEventWhenStatusChangesToRead() {
         UUID id = UUID.randomUUID();
-        Book book = bookWithStatus(id, ReadingStatus.READING);          // ajuste
+        Book book = bookWithStatus(id, ReadingStatus.READING);
         when(bookRepository.findById(id)).thenReturn(Optional.of(book));
         when(bookRepository.save(any(Book.class))).thenAnswer(inv -> inv.getArgument(0));
 
-        bookService.updateBook(id, readRequest(5, new Date(2026, 10, 12)));   // ajuste
+        bookService.updateBook(id, readRequest(5, new Date(2026, 10, 12)));
 
         ArgumentCaptor<BookFinishedEvent> captor = ArgumentCaptor.forClass(BookFinishedEvent.class);
         verify(eventPublisher).publishBookFinishedEvent(captor.capture());
@@ -69,13 +67,12 @@ class BooksServiceTest {
         when(bookRepository.findById(id)).thenReturn(Optional.empty());
 
         assertThatThrownBy(() -> bookService.updateBook(id, readRequest(5, new Date())))
-                .isInstanceOf(RuntimeException.class).message().isEqualTo("Book not found");// ajuste
+                .isInstanceOf(RuntimeException.class).message().isEqualTo("Book not found");
 
         verify(bookRepository, never()).save(any());
         verify(eventPublisher, never()).publishBookFinishedEvent(any());
     }
 
-    // helpers: ajuste aos construtores/setters reais de Book e BookRequestDTO
     private Book bookWithStatus(UUID id, ReadingStatus status) {
         Book newbook = new Book();
         newbook.setId(id);

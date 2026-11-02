@@ -2,7 +2,9 @@ package com.studies.books_service.service;
 
 import com.studies.books_service.domain.idempotency.Idempotency;
 import com.studies.books_service.domain.idempotency.IdempotencyStatus;
-import com.studies.books_service.domain.idempotency.IdempotentResponse;
+import com.studies.books_service.dto.idempotency.IdempotentResponseDTO;
+import com.studies.books_service.exceptions.IdempotencyConflictException;
+import com.studies.books_service.exceptions.IdempotencyKeyReuseException;
 import com.studies.books_service.repository.IdempotencyStore;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
@@ -25,7 +27,7 @@ public class IdempotencyService {
     private JsonMapper jsonMapper;
 
 
-    public IdempotentResponse execute(String key, Object body, Supplier<IdempotentResponse> action){
+    public IdempotentResponseDTO execute(String key, Object body, Supplier<IdempotentResponseDTO> action){
         String requestHash = this.hash(body);
 
         boolean isReserved = idempotencyStore.tryReserve(key, requestHash);
@@ -33,7 +35,7 @@ public class IdempotencyService {
         if (!isReserved) {
             return handleExistingKey(key, requestHash);
         }
-        IdempotentResponse result;
+        IdempotentResponseDTO result;
         try {
             result = action.get();
         }catch (RuntimeException e) {
@@ -57,7 +59,7 @@ public class IdempotencyService {
 
     }
 
-    private IdempotentResponse handleExistingKey(String key, String requestHash) {
+    private IdempotentResponseDTO handleExistingKey(String key, String requestHash) {
         Optional<Idempotency> optionalKey = idempotencyStore.find(key);
 
         if (optionalKey.isEmpty()) {
@@ -67,14 +69,14 @@ public class IdempotencyService {
         Idempotency existingKey = optionalKey.get();
 
         if (existingKey.status() == IdempotencyStatus.IN_PROGRESS) {
-            throw new IllegalStateException("Idempotency Conflict Exception");
+            throw new IdempotencyConflictException("Idempotency Key Conflict: Another request with the same key is already in progress.");
         }
 
         if (existingKey.status() == IdempotencyStatus.COMPLETED && !existingKey.requestHash().equals(requestHash)) {
-            throw new IllegalStateException("Idempotency Key Reuse Exception");
+            throw new IdempotencyKeyReuseException("Idempotency Key Reuse: A request with the same key has completed with a different body.");
         }
 
-        return new IdempotentResponse(existingKey.httpStatus(), existingKey.responseBody());
+        return new IdempotentResponseDTO(existingKey.httpStatus(), existingKey.responseBody());
     }
 
 }
