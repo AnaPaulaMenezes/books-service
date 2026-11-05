@@ -2,7 +2,7 @@ package com.studies.books_service.service;
 
 import com.studies.books_service.domain.idempotency.Idempotency;
 import com.studies.books_service.domain.idempotency.IdempotencyStatus;
-import com.studies.books_service.dto.idempotency.IdempotentResponseDTO;
+import com.studies.books_service.dto.idempotency.IdempotentResponse;
 import com.studies.books_service.exceptions.IdempotencyConflictException;
 import com.studies.books_service.exceptions.IdempotencyKeyReuseException;
 import com.studies.books_service.repository.IdempotencyStore;
@@ -20,6 +20,7 @@ import java.util.function.Supplier;
 @Service
 public class IdempotencyService {
 
+    private static final int MAX_ATTEMPTS = 2;
     @Autowired
     private IdempotencyStore idempotencyStore;
 
@@ -27,24 +28,23 @@ public class IdempotencyService {
     private JsonMapper jsonMapper;
 
 
-    public IdempotentResponseDTO execute(String key, Object body, Supplier<IdempotentResponseDTO> action){
+    public IdempotentResponse execute(String key, Object body, Supplier<IdempotentResponse> action){
         String requestHash = this.hash(body);
 
-        boolean isReserved = idempotencyStore.tryReserve(key, requestHash);
+        for (int attempt = 0; attempt < MAX_ATTEMPTS; attempt++) {
+            boolean isReserved = idempotencyStore.tryReserve(key, requestHash);
+            if (isReserved) {
+                return runAndComplete(key, action);
+            }
 
-        if (!isReserved) {
-            return handleExistingKey(key, requestHash);
-        }
-        IdempotentResponseDTO result;
-        try {
-            result = action.get();
-        }catch (RuntimeException e) {
-            idempotencyStore.release(key);
-            throw e;
+            Optional<Idempotency> existingKey = idempotencyStore.find(key);
+
+            if (existingKey.isPresent()) {
+                return handleExistingKey(existingKey.get(), requestHash);
+            }
         }
 
-        idempotencyStore.complete(key, result.httpStatus(), result.responseBody());
-        return result;
+        throw new IdempotencyConflictException("Idempotency Key Conflict: Unable to reserve or find the idempotency key after multiple attempts.");
     }
 
     private String hash(Object requestBody)  {
@@ -59,24 +59,29 @@ public class IdempotencyService {
 
     }
 
-    private IdempotentResponseDTO handleExistingKey(String key, String requestHash) {
-        Optional<Idempotency> optionalKey = idempotencyStore.find(key);
-
-        if (optionalKey.isEmpty()) {
-            throw new IllegalStateException("Idempotency key not found");
+    private IdempotentResponse runAndComplete(String key, Supplier<IdempotentResponse> action){
+        IdempotentResponse result;
+        try {
+            result = action.get();
+        }catch (RuntimeException e) {
+            idempotencyStore.release(key);
+            throw e;
         }
 
-        Idempotency existingKey = optionalKey.get();
+        idempotencyStore.complete(key, result.httpStatus(), result.responseBody());
+        return result;
+    }
 
+    private IdempotentResponse handleExistingKey(Idempotency existingKey, String requestHash) {
         if (existingKey.status() == IdempotencyStatus.IN_PROGRESS) {
             throw new IdempotencyConflictException("Idempotency Key Conflict: Another request with the same key is already in progress.");
         }
 
-        if (existingKey.status() == IdempotencyStatus.COMPLETED && !existingKey.requestHash().equals(requestHash)) {
+        if (!existingKey.requestHash().equals(requestHash)) {
             throw new IdempotencyKeyReuseException("Idempotency Key Reuse: A request with the same key has completed with a different body.");
         }
 
-        return new IdempotentResponseDTO(existingKey.httpStatus(), existingKey.responseBody());
+        return new IdempotentResponse(existingKey.httpStatus(), existingKey.responseBody());
     }
 
 }

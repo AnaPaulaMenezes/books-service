@@ -2,7 +2,7 @@ package com.studies.books_service.controller;
 
 import com.studies.books_service.domain.book.Book;
 import com.studies.books_service.domain.book.ReadingStatus;
-import com.studies.books_service.dto.idempotency.IdempotentResponseDTO;
+import com.studies.books_service.dto.idempotency.IdempotentResponse;
 import com.studies.books_service.dto.book.BookResponseDTO;
 import com.studies.books_service.dto.book.CreateBookDTO;
 import com.studies.books_service.dto.book.UpdateBookDTO;
@@ -34,10 +34,10 @@ public class BookController {
             @RequestHeader("Idempotency-Key") String key,
             @RequestBody CreateBookDTO request
     ) {
-       IdempotentResponseDTO response = idempotencyService.execute(key, request, () -> {
+       IdempotentResponse response = idempotencyService.execute(key, request, () -> {
            Book createdBook = bookService.createBook(request);
            BookResponseDTO dto = BookResponseDTO.from(createdBook);
-           return new IdempotentResponseDTO(HttpStatus.CREATED.value(), jsonMapper.writeValueAsString(dto));
+           return new IdempotentResponse(HttpStatus.CREATED.value(), jsonMapper.writeValueAsString(dto));
         });
 
         return ResponseEntity.status(response.httpStatus())
